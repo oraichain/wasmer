@@ -216,7 +216,7 @@ cfg_if::cfg_if! {
                 }
                 _ => None,
             };
-            let ucontext = &mut *(context as *mut libc::ucontext_t);
+            let ucontext = &mut (context as *mut libc::ucontext_t).read_unaligned();
             let (pc, sp) = get_pc_sp(ucontext);
             let handled = TrapHandlerContext::handle_trap(
                 pc,
