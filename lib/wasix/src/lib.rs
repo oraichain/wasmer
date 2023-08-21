@@ -30,6 +30,9 @@ compile_error!(
     "The `js` feature must be enabled only for the `wasm32` target (either `wasm32-unknown-unknown` or `wasm32-wasi`)."
 );
 
+#[cfg(all(test, target_arch = "wasm32"))]
+wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
@@ -74,8 +77,9 @@ pub use virtual_net;
 pub use virtual_net::{UnsupportedVirtualNetworking, VirtualNetworking};
 
 #[cfg(feature = "host-vnet")]
-pub use virtual_net::host::{
-    io_err_into_net_error, LocalNetworking, LocalTcpListener, LocalTcpStream, LocalUdpSocket,
+pub use virtual_net::{
+    host::{LocalNetworking, LocalTcpListener, LocalTcpStream, LocalUdpSocket},
+    io_err_into_net_error,
 };
 use wasmer_wasix_types::wasi::{Errno, ExitCode};
 
