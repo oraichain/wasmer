@@ -222,15 +222,14 @@ impl Console {
             .with_envs(self.env.clone().into_iter())
             .with_args(args)
             .with_capabilities(self.capabilities.clone())
+            .with_stdin(Box::new(self.stdin.clone()))
+            .with_stdout(Box::new(self.stdout.clone()))
+            .with_stderr(Box::new(self.stderr.clone()))
             .prepare_webc_env(prog, &wasi_opts, &pkg, self.runtime.clone(), Some(root_fs))
             // TODO: better error conversion
             .map_err(|err| SpawnError::Other(err.into()))?;
 
-        let env = builder
-            .stdin(Box::new(self.stdin.clone()))
-            .stdout(Box::new(self.stdout.clone()))
-            .stderr(Box::new(self.stderr.clone()))
-            .build()?;
+        let env = builder.build()?;
 
         // Display the welcome message
         if !self.whitelabel && !self.no_welcome {
@@ -364,5 +363,33 @@ mod tests {
         stdout_rx.read_to_string(&mut out).unwrap();
 
         assert_eq!(out, "hello VAL1\n");
+    }
+
+    /// Regression test to ensure merging of multiple packages works correctly.
+    #[test]
+    fn test_console_python_merge() {
+        std::env::set_var("RUST_LOG", "wasmer_wasix=trace");
+        tracing_subscriber::fmt::init();
+        let tokio_rt = tokio::runtime::Runtime::new().unwrap();
+        let rt_handle = tokio_rt.handle().clone();
+        let _guard = rt_handle.enter();
+
+        let tm = TokioTaskManager::new(tokio_rt);
+        let mut rt = PluggableRuntime::new(Arc::new(tm));
+        rt.set_engine(Some(wasmer::Engine::default()))
+            .set_package_loader(BuiltinPackageLoader::from_env().unwrap());
+
+        let cmd = "wasmer-tests/python-env-dump --help";
+
+        let (mut handle, _proc) = Console::new(cmd, Arc::new(rt)).run().unwrap();
+
+        let code = rt_handle
+            .block_on(async move {
+                let res = handle.wait_finished().await?;
+                Ok::<_, anyhow::Error>(res)
+            })
+            .unwrap();
+
+        assert_eq!(code.raw(), 0);
     }
 }

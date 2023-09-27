@@ -31,9 +31,24 @@ pub fn sock_open<M: MemorySize>(
     let env = ctx.data();
     let (memory, state, inodes) = unsafe { env.get_memory_and_wasi_state_and_inodes(&ctx, 0) };
 
+    // only certain combinations are supported
+    match pt {
+        SockProto::Tcp => {
+            if ty != Socktype::Stream {
+                return Errno::Notsup;
+            }
+        }
+        SockProto::Udp => {
+            if ty != Socktype::Dgram {
+                return Errno::Notsup;
+            }
+        }
+        _ => {}
+    }
+
     let kind = match ty {
         Socktype::Stream | Socktype::Dgram => Kind::Socket {
-            socket: InodeSocket::new(InodeSocketKind::PreSocket {
+            socket: wasi_try!(InodeSocket::new(InodeSocketKind::PreSocket {
                 family: af,
                 ty,
                 pt,
@@ -41,13 +56,18 @@ pub fn sock_open<M: MemorySize>(
                 only_v6: false,
                 reuse_port: false,
                 reuse_addr: false,
+                no_delay: None,
+                keep_alive: None,
+                dont_route: None,
                 send_buf_size: None,
                 recv_buf_size: None,
                 write_timeout: None,
                 read_timeout: None,
                 accept_timeout: None,
                 connect_timeout: None,
-            }),
+                handler: None,
+            })
+            .map_err(net_error_into_wasi_err)),
         },
         _ => return Errno::Notsup,
     };

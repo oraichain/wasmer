@@ -18,7 +18,7 @@ use crate::{fs::NotificationInner, net::socket::TimeType, syscalls::*};
 /// - `u32 *nread`
 ///     Number of bytes read
 ///
-#[instrument(level = "trace", skip_all, fields(%fd, nread = field::Empty), ret, err)]
+#[instrument(level = "trace", skip_all, fields(%fd, nread = field::Empty), ret)]
 pub fn fd_read<M: MemorySize>(
     mut ctx: FunctionEnvMut<'_, WasiEnv>,
     fd: WasiFd,
@@ -57,7 +57,7 @@ pub fn fd_read<M: MemorySize>(
 /// Output:
 /// - `size_t nread`
 ///     The number of bytes read
-#[instrument(level = "trace", skip_all, fields(%fd, %offset, ?nread), ret, err)]
+#[instrument(level = "trace", skip_all, fields(%fd, %offset, ?nread), ret)]
 pub fn fd_pread<M: MemorySize>(
     mut ctx: FunctionEnvMut<'_, WasiEnv>,
     fd: WasiFd,
@@ -351,13 +351,10 @@ pub(crate) fn fd_read_internal<M: MemorySize>(
                     // Yield until the notifications are triggered
                     let tasks_inner = env.tasks().clone();
 
-                    let res =
-                        __asyncify_light(env, None, async { poller.await })?.map_err(
-                            |err| match err {
-                                Errno::Timedout => Errno::Again,
-                                a => a,
-                            },
-                        );
+                    let res = __asyncify_light(env, None, poller)?.map_err(|err| match err {
+                        Errno::Timedout => Errno::Again,
+                        a => a,
+                    });
                     let val = wasi_try_ok_ok!(res);
 
                     let mut memory = unsafe { env.memory_view(ctx) };

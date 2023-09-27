@@ -16,7 +16,7 @@ use crate::{net::socket::TimeType, syscalls::*};
 /// ## Return
 ///
 /// Number of bytes transmitted.
-#[instrument(level = "trace", skip_all, fields(%sock, nsent = field::Empty), ret, err)]
+#[instrument(level = "trace", skip_all, fields(%sock, nsent = field::Empty), ret)]
 pub fn sock_send<M: MemorySize>(
     ctx: FunctionEnvMut<'_, WasiEnv>,
     sock: WasiFd,
@@ -25,7 +25,16 @@ pub fn sock_send<M: MemorySize>(
     si_flags: SiFlags,
     ret_data_len: WasmPtr<M::Offset, M>,
 ) -> Result<Errno, WasiError> {
-    sock_send_internal(ctx, sock, si_data, si_data_len, si_flags, ret_data_len)
+    let env = ctx.data();
+    let fd_entry = env.state.fs.get_fd(sock).unwrap();
+    let guard = fd_entry.inode.read();
+    let use_write = matches!(guard.deref(), Kind::Pipe { .. });
+    drop(guard);
+    if use_write {
+        fd_write(ctx, sock, si_data, si_data_len, ret_data_len)
+    } else {
+        sock_send_internal(ctx, sock, si_data, si_data_len, si_flags, ret_data_len)
+    }
 }
 
 pub(super) fn sock_send_internal<M: MemorySize>(

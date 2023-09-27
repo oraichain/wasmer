@@ -15,7 +15,7 @@ use crate::{net::socket::TimeType, syscalls::*};
 /// ## Return
 ///
 /// New socket connection
-#[instrument(level = "debug", skip_all, fields(%sock, fd = field::Empty), ret, err)]
+#[instrument(level = "debug", skip_all, fields(%sock, fd = field::Empty), ret)]
 pub fn sock_accept<M: MemorySize>(
     mut ctx: FunctionEnvMut<'_, WasiEnv>,
     sock: WasiFd,
@@ -49,7 +49,7 @@ pub fn sock_accept<M: MemorySize>(
 /// ## Return
 ///
 /// New socket connection
-#[instrument(level = "debug", skip_all, fields(%sock, fd = field::Empty), ret, err)]
+#[instrument(level = "debug", skip_all, fields(%sock, fd = field::Empty), ret)]
 pub fn sock_accept_v2<M: MemorySize>(
     mut ctx: FunctionEnvMut<'_, WasiEnv>,
     sock: WasiFd,
@@ -113,7 +113,8 @@ pub fn sock_accept_internal(
             socket: child,
             write_timeout: None,
             read_timeout: None,
-        }),
+        })
+        .map_err(net_error_into_wasi_err)?,
     };
     let inode = state
         .fs
